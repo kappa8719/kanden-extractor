@@ -1,23 +1,22 @@
 package kr.entropi.kanden.extractor.dummy
 
 import com.mojang.authlib.GameProfile
-import kr.entropi.kanden.extractor.Extractor
 import kr.entropi.kanden.extractor.initiateWithoutConstructor
-import net.minecraft.entity.data.DataTracker
-import net.minecraft.entity.player.PlayerEntity
-import net.minecraft.world.GameMode
-import net.minecraft.world.World
+import net.minecraft.network.syncher.SynchedEntityData
+import net.minecraft.server.level.ServerLevel
+import net.minecraft.world.entity.player.Player
+import net.minecraft.world.level.GameType
 
-class DummyPlayerEntity(world: World, profile: GameProfile) : PlayerEntity(world, profile) {
+class DummyPlayerEntity(world: ServerLevel, profile: GameProfile) : Player(world, profile) {
     companion object {
         val INSTANCE: DummyPlayerEntity = initiateWithoutConstructor(DummyPlayerEntity::class.java)
 
         init {
-            INSTANCE.initDataTracker(DataTracker.Builder(INSTANCE))
+            INSTANCE.defineSynchedData(SynchedEntityData.Builder(INSTANCE))
         }
     }
 
-    override fun getGameMode(): GameMode? {
-        return GameMode.DEFAULT
+    override fun gameMode(): GameType? {
+        return GameType.DEFAULT_MODE
     }
 }

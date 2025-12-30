@@ -25,7 +25,11 @@ class Extractor : ModInitializer {
         val extractors = arrayOf(
             Attributes(),
             Blocks(),
+            Effects(),
+            Enchants(),
             Entities(),
+            Items(),
+            Misc()
         )
 
         val outputDirectory: Path
@@ -53,7 +57,7 @@ class Extractor : ModInitializer {
                 }
             }
             logger.info("Done, took ${timeInMillis}ms")
-            server.stop(false)
+            server.halt(false)
         })
     }
 

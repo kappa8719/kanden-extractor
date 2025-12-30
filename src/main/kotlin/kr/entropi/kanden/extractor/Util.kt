@@ -2,8 +2,8 @@ package kr.entropi.kanden.extractor
 
 import com.google.gson.JsonNull
 import com.google.gson.JsonPrimitive
-import kr.entropi.kanden.extractor.dummy.DummyPlayerEntity
 import sun.reflect.ReflectionFactory
+import java.util.Optional
 
 fun <T> initiateWithoutConstructor(clazz: Class<T>): T {
     val factory = ReflectionFactory.getReflectionFactory()
@@ -18,3 +18,21 @@ fun <T> initiateWithoutConstructor(clazz: Class<T>): T {
 
 fun jsonNullable(string: String?) =
     string?.let { JsonPrimitive(string) } ?: JsonNull.INSTANCE
+
+fun String.pascalCase(): String {
+    val result = StringBuilder()
+    var capitalizeNext = true
+
+    for (c in this) {
+        if (Character.isWhitespace(c) || '_' == c) {
+            capitalizeNext = true
+        } else if (capitalizeNext) {
+            result.append(c.uppercaseChar())
+            capitalizeNext = false
+        } else {
+            result.append(c.lowercaseChar())
+        }
+    }
+
+    return result.toString()
+}

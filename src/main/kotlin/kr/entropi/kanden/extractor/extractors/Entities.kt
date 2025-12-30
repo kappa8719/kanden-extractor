@@ -6,95 +6,95 @@ import kr.entropi.kanden.extractor.ClassComparator
 import kr.entropi.kanden.extractor.Extractor
 import kr.entropi.kanden.extractor.dummy.DummyPlayerEntity
 import kr.entropi.kanden.extractor.jsonNullable
-import net.minecraft.block.BlockState
-import net.minecraft.block.Oxidizable
-import net.minecraft.component.type.ProfileComponent
-import net.minecraft.entity.*
-import net.minecraft.entity.attribute.DefaultAttributeRegistry
-import net.minecraft.entity.attribute.EntityAttribute
-import net.minecraft.entity.attribute.EntityAttributeInstance
-import net.minecraft.entity.data.DataTracker
-import net.minecraft.entity.data.TrackedData
-import net.minecraft.entity.data.TrackedDataHandler
-import net.minecraft.entity.data.TrackedDataHandlerRegistry
-import net.minecraft.entity.decoration.MannequinEntity
-import net.minecraft.entity.passive.*
-import net.minecraft.item.ItemStack
-import net.minecraft.particle.ParticleEffect
-import net.minecraft.registry.Registries
-import net.minecraft.registry.entry.RegistryEntry
+import net.minecraft.core.BlockPos
+import net.minecraft.core.GlobalPos
+import net.minecraft.core.Holder
+import net.minecraft.core.Rotations
+import net.minecraft.core.particles.ParticleOptions
+import net.minecraft.core.registries.BuiltInRegistries
+import net.minecraft.network.chat.Component
+import net.minecraft.network.syncher.EntityDataAccessor
+import net.minecraft.network.syncher.EntityDataSerializer
+import net.minecraft.network.syncher.EntityDataSerializers
+import net.minecraft.network.syncher.SynchedEntityData
 import net.minecraft.server.MinecraftServer
-import net.minecraft.server.world.ServerWorld
-import net.minecraft.text.Text
-import net.minecraft.util.Arm
-import net.minecraft.util.math.BlockPos
-import net.minecraft.util.math.EulerAngle
-import net.minecraft.util.math.GlobalPos
-import net.minecraft.village.VillagerData
+import net.minecraft.server.level.ServerLevel
+import net.minecraft.world.entity.*
+import net.minecraft.world.entity.ai.attributes.Attribute
+import net.minecraft.world.entity.ai.attributes.AttributeInstance
+import net.minecraft.world.entity.ai.attributes.DefaultAttributes
+import net.minecraft.world.entity.animal.armadillo.Armadillo
+import net.minecraft.world.entity.animal.golem.CopperGolemState
+import net.minecraft.world.entity.animal.sniffer.Sniffer
+import net.minecraft.world.entity.npc.villager.VillagerData
+import net.minecraft.world.item.ItemStack
+import net.minecraft.world.item.component.ResolvableProfile
+import net.minecraft.world.level.block.WeatheringCopper
+import net.minecraft.world.level.block.state.BlockState
 import org.joml.Quaternionfc
 import org.joml.Vector3fc
 import java.lang.reflect.ParameterizedType
 import java.util.*
 
 class Entities : Extractor.Extractor {
-    lateinit var world: ServerWorld
+    lateinit var world: ServerLevel
 
     private fun <T> mapOptionalToJson(value: Optional<T>, f: (T) -> JsonElement): JsonElement {
         return value.map(f).orElse(JsonNull.INSTANCE)
     }
 
     private fun mapRegistryIdToJson(value: Any): JsonPrimitive {
-        val value = value as RegistryEntry<*>
-        return JsonPrimitive(value.idAsString)
+        val value = value as Holder<*>
+        return JsonPrimitive(value.registeredName)
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun trackedDataToJson(data: TrackedData<*>, tracker: DataTracker): Pair<String, JsonElement> {
-        val handler: TrackedDataHandler<*> = data.dataType()
+    private fun trackedDataToJson(data: EntityDataAccessor<*>, tracker: SynchedEntityData): Pair<String, JsonElement> {
+        val handler: EntityDataSerializer<*> = data.serializer()
         val value: Any = tracker.get(data)
 
         return when (handler) {
-            TrackedDataHandlerRegistry.BYTE -> {
+            EntityDataSerializers.BYTE -> {
                 "byte" to JsonPrimitive(value as Byte)
             }
 
-            TrackedDataHandlerRegistry.INTEGER -> {
+            EntityDataSerializers.INT -> {
                 "integer" to JsonPrimitive(value as Int)
             }
 
-            TrackedDataHandlerRegistry.LONG -> {
+            EntityDataSerializers.LONG -> {
                 "long" to JsonPrimitive(value as Long)
             }
 
-            TrackedDataHandlerRegistry.FLOAT -> {
+            EntityDataSerializers.FLOAT -> {
                 "float" to JsonPrimitive(value as Float)
             }
 
-            TrackedDataHandlerRegistry.STRING -> {
+            EntityDataSerializers.STRING -> {
                 "string" to JsonPrimitive(value as String)
             }
 
-            TrackedDataHandlerRegistry.TEXT_COMPONENT -> {
-                "text_component" to JsonPrimitive((value as Text).string)
+            EntityDataSerializers.COMPONENT -> {
+                "text_component" to JsonPrimitive((value as Component).string)
             }
 
-            TrackedDataHandlerRegistry.OPTIONAL_TEXT_COMPONENT -> {
-                "optional_text_component" to mapOptionalToJson(value as Optional<Text>) {
+            EntityDataSerializers.OPTIONAL_COMPONENT -> {
+                "optional_text_component" to mapOptionalToJson(value as Optional<Component>) {
                     JsonPrimitive(
                         it.string
                     )
                 }
             }
 
-            TrackedDataHandlerRegistry.ITEM_STACK -> {
+            EntityDataSerializers.ITEM_STACK -> {
                 "item_stack" to JsonPrimitive((value as ItemStack).toString())
             }
 
-            TrackedDataHandlerRegistry.BLOCK_STATE -> {
+            EntityDataSerializers.BLOCK_STATE -> {
                 "block_state" to JsonPrimitive((value as BlockState).toString())
             }
 
-            TrackedDataHandlerRegistry.OPTIONAL_BLOCK_STATE -> {
+            EntityDataSerializers.OPTIONAL_BLOCK_STATE -> {
                 "optional_block_state" to mapOptionalToJson(value as Optional<BlockState>) {
                     JsonPrimitive(
                         it.toString()
@@ -102,37 +102,37 @@ class Entities : Extractor.Extractor {
                 }
             }
 
-            TrackedDataHandlerRegistry.BOOLEAN -> {
+            EntityDataSerializers.BOOLEAN -> {
                 "boolean" to JsonPrimitive(value as Boolean)
             }
 
-            TrackedDataHandlerRegistry.PARTICLE -> {
-                val id = Registries.PARTICLE_TYPE.getId((value as ParticleEffect).type)!!
+            EntityDataSerializers.PARTICLE -> {
+                val id = BuiltInRegistries.PARTICLE_TYPE.getKey((value as ParticleOptions).type)!!
                 "particle" to JsonPrimitive(id.path)
             }
 
-            TrackedDataHandlerRegistry.PARTICLE_LIST -> {
-                val particleList = value as List<ParticleEffect>
+            EntityDataSerializers.PARTICLES -> {
+                val particleList = value as List<ParticleOptions>
                 val json = JsonArray()
                 for (particle in particleList) {
-                    val id = Registries.PARTICLE_TYPE.getId(particle.type)!!
+                    val id = BuiltInRegistries.PARTICLE_TYPE.getKey(particle.type)!!
                     json.add(id.path)
                 }
 
                 "particle_list" to json
             }
 
-            TrackedDataHandlerRegistry.ROTATION -> {
-                val rotation = value as EulerAngle
+            EntityDataSerializers.ROTATIONS -> {
+                val rotation = value as Rotations
                 val json = JsonObject()
-                json.addProperty("pitch", rotation.pitch)
-                json.addProperty("yaw", rotation.yaw)
-                json.addProperty("roll", rotation.roll)
+                json.addProperty("pitch", rotation.x)
+                json.addProperty("yaw", rotation.y)
+                json.addProperty("roll", rotation.z)
 
                 "rotation" to json
             }
 
-            TrackedDataHandlerRegistry.BLOCK_POS -> {
+            EntityDataSerializers.BLOCK_POS -> {
                 val blockPos = value as BlockPos
                 val json = JsonObject()
                 json.addProperty("x", blockPos.x)
@@ -142,7 +142,7 @@ class Entities : Extractor.Extractor {
                 "block_pos" to json
             }
 
-            TrackedDataHandlerRegistry.OPTIONAL_BLOCK_POS -> {
+            EntityDataSerializers.OPTIONAL_BLOCK_POS -> {
                 "optional_block_pos" to mapOptionalToJson(value as Optional<BlockPos>) {
                     val json = JsonObject()
                     json.addProperty("x", it.x)
@@ -153,19 +153,19 @@ class Entities : Extractor.Extractor {
                 }
             }
 
-            TrackedDataHandlerRegistry.FACING -> {
+            EntityDataSerializers.DIRECTION -> {
                 "facing" to JsonPrimitive(value.toString())
             }
 
-            TrackedDataHandlerRegistry.LAZY_ENTITY_REFERENCE -> {
-                "lazy_entity_reference" to mapOptionalToJson(value as Optional<LazyEntityReference<LivingEntity>>) {
+            EntityDataSerializers.OPTIONAL_LIVING_ENTITY_REFERENCE -> {
+                "optional_living_entity_reference" to mapOptionalToJson(value as Optional<EntityReference<LivingEntity>>) {
                     JsonPrimitive(
                         it.uuid.toString()
                     )
                 }
             }
 
-            TrackedDataHandlerRegistry.OPTIONAL_GLOBAL_POS -> {
+            EntityDataSerializers.OPTIONAL_GLOBAL_POS -> {
                 "optional_global_pos" to mapOptionalToJson(value as Optional<GlobalPos>) {
                     val position = JsonObject()
                     position.addProperty("x", it.pos().x)
@@ -174,19 +174,18 @@ class Entities : Extractor.Extractor {
 
                     val json = JsonObject()
                     json.add("position", position)
-                    json.addProperty("dimension", it.dimension().value.toString())
+                    json.addProperty("dimension", it.dimension.identifier().path)
 
                     json
                 }
             }
 
-            TrackedDataHandlerRegistry.VILLAGER_DATA -> {
+            EntityDataSerializers.VILLAGER_DATA -> {
                 val villagerData = value as VillagerData
-                villagerData.type
 
                 val json = JsonObject()
-                val type = Registries.VILLAGER_TYPE.getId(villagerData.type.value()).path
-                val profession = Registries.VILLAGER_PROFESSION.getId(villagerData.profession.value()).path
+                val type = BuiltInRegistries.VILLAGER_TYPE.getKey(villagerData.type.value()).path
+                val profession = BuiltInRegistries.VILLAGER_PROFESSION.getKey(villagerData.profession.value()).path
                 json.addProperty("type", type)
                 json.addProperty("profession", profession)
                 json.addProperty("level", villagerData.level)
@@ -194,70 +193,70 @@ class Entities : Extractor.Extractor {
                 "villager_data" to json
             }
 
-            TrackedDataHandlerRegistry.OPTIONAL_INT -> {
+            EntityDataSerializers.OPTIONAL_UNSIGNED_INT -> {
                 val value = value as OptionalInt
                 "optional_int" to if (value.isPresent) JsonPrimitive(value.asInt) else JsonNull.INSTANCE
             }
 
-            TrackedDataHandlerRegistry.ENTITY_POSE -> {
-                "entity_pose" to JsonPrimitive((value as EntityPose).asString())
+            EntityDataSerializers.POSE -> {
+                "entity_pose" to JsonPrimitive((value as Pose).serializedName)
             }
 
-            TrackedDataHandlerRegistry.CAT_VARIANT -> {
+            EntityDataSerializers.CAT_VARIANT -> {
                 "cat_variant" to mapRegistryIdToJson(value)
             }
 
-            TrackedDataHandlerRegistry.CHICKEN_VARIANT -> {
+            EntityDataSerializers.CHICKEN_VARIANT -> {
                 "chicken_variant" to mapRegistryIdToJson(value)
             }
 
-            TrackedDataHandlerRegistry.COW_VARIANT -> {
+            EntityDataSerializers.COW_VARIANT -> {
                 "cow_variant" to mapRegistryIdToJson(value)
             }
 
-            TrackedDataHandlerRegistry.WOLF_VARIANT -> {
+            EntityDataSerializers.WOLF_VARIANT -> {
                 "wolf_variant" to mapRegistryIdToJson(value)
             }
 
-            TrackedDataHandlerRegistry.WOLF_SOUND_VARIANT -> {
+            EntityDataSerializers.WOLF_SOUND_VARIANT -> {
                 "wolf_sound_variant" to mapRegistryIdToJson(value)
             }
 
-            TrackedDataHandlerRegistry.FROG_VARIANT -> {
+            EntityDataSerializers.FROG_VARIANT -> {
                 "frog_variant" to mapRegistryIdToJson(value)
             }
 
-            TrackedDataHandlerRegistry.PIG_VARIANT -> {
+            EntityDataSerializers.PIG_VARIANT -> {
                 "pig_variant" to mapRegistryIdToJson(value)
             }
 
-            TrackedDataHandlerRegistry.ZOMBIE_NAUTILUS_VARIANT -> {
+            EntityDataSerializers.ZOMBIE_NAUTILUS_VARIANT -> {
                 "zombie_nautilus_variant" to mapRegistryIdToJson(value)
             }
 
-            TrackedDataHandlerRegistry.PAINTING_VARIANT -> {
+            EntityDataSerializers.PAINTING_VARIANT -> {
                 "painting_variant" to mapRegistryIdToJson(value)
             }
 
-            TrackedDataHandlerRegistry.ARMADILLO_STATE -> {
-                "armadillo_state" to JsonPrimitive((value as ArmadilloEntity.State).asString())
+            EntityDataSerializers.ARMADILLO_STATE -> {
+                "armadillo_state" to JsonPrimitive((value as Armadillo.ArmadilloState).serializedName)
             }
 
-            TrackedDataHandlerRegistry.SNIFFER_STATE -> {
-                "sniffer_state" to JsonPrimitive((value as SnifferEntity.State).name.lowercase())
+            EntityDataSerializers.SNIFFER_STATE -> {
+                "sniffer_state" to JsonPrimitive((value as Sniffer.State).name.lowercase())
             }
 
-            TrackedDataHandlerRegistry.OXIDATION_LEVEL -> {
+            EntityDataSerializers.WEATHERING_COPPER_STATE -> {
                 "oxidation_level" to JsonPrimitive(
-                    (value as Oxidizable.OxidationLevel).asString()
+                    (value as WeatheringCopper.WeatherState).serializedName
                 )
             }
 
-            TrackedDataHandlerRegistry.COPPER_GOLEM_STATE -> {
-                "copper_golem_state" to JsonPrimitive((value as CopperGolemState).asString())
+            EntityDataSerializers.COPPER_GOLEM_STATE -> {
+                "copper_golem_state" to JsonPrimitive((value as CopperGolemState).serializedName)
             }
 
-            TrackedDataHandlerRegistry.VECTOR_3F -> {
+            EntityDataSerializers.VECTOR3 -> {
                 val vector = value as Vector3fc
                 val json = JsonObject()
                 json.addProperty("x", vector.x())
@@ -267,7 +266,7 @@ class Entities : Extractor.Extractor {
                 "vector3f" to json
             }
 
-            TrackedDataHandlerRegistry.QUATERNION_F -> {
+            EntityDataSerializers.QUATERNION -> {
                 val vector = value as Quaternionfc
                 val json = JsonObject()
                 json.addProperty("x", vector.x())
@@ -279,30 +278,30 @@ class Entities : Extractor.Extractor {
             }
 
 
-            TrackedDataHandlerRegistry.PROFILE -> {
-                val profile = value as ProfileComponent
+            EntityDataSerializers.RESOLVABLE_PROFILE -> {
+                val profile = value as ResolvableProfile
 
-                "profile" to mapOptionalToJson(profile.name) { JsonPrimitive(it) }
+                "profile" to mapOptionalToJson(profile.name()) { JsonPrimitive(it) }
             }
 
-            TrackedDataHandlerRegistry.ARM -> {
-                val arm = value as Arm
+            EntityDataSerializers.HUMANOID_ARM -> {
+                val arm = value as HumanoidArm
 
-                "arm" to JsonPrimitive(arm.asString())
+                "arm" to JsonPrimitive(arm.serializedName)
             }
 
             else -> {
                 println("${handler.javaClass}")
 
                 throw IllegalArgumentException(
-                    "Unexpected tracked handler of ID ${TrackedDataHandlerRegistry.getId(handler)}$handler"
+                    "Unexpected tracked handler of ID ${EntityDataSerializers.getSerializedId(handler)}: $handler"
                 )
             }
         }
     }
 
     override fun extract(server: MinecraftServer): JsonElement {
-        this.world = server.overworld
+        this.world = server.overworld()
 
         val entityList = mutableListOf<Pair<Class<out Entity>, EntityType<*>?>>()
         val entityClassTypeMap = HashMap<Class<out Entity?>, EntityType<*>>()
@@ -336,10 +335,10 @@ class Entities : Extractor.Extractor {
             val entityInstance: Entity = if (entityType == EntityType.PLAYER) DummyPlayerEntity(
                 world, GameProfile(UUID.randomUUID(), "dummy")
             )
-            else entityType!!.create(world, null)!!
+            else entityType!!.create(world, EntitySpawnReason.COMMAND)!!
 
 
-            val dataTracker = dataTrackerField.get(entityInstance) as DataTracker
+            val dataTracker = dataTrackerField.get(entityInstance) as SynchedEntityData
 
             while (entitiesMap.get(entityClass) == null) {
                 val entityJson = JsonObject()
@@ -352,18 +351,18 @@ class Entities : Extractor.Extractor {
                 }
 
                 if (entityType != null) {
-                    entityJson.addProperty("type", Registries.ENTITY_TYPE.getId(entityType).path)
-                    entityJson.add("translation_key", jsonNullable(entityType.translationKey))
+                    entityJson.addProperty("type", BuiltInRegistries.ENTITY_TYPE.getKey(entityType).path)
+                    entityJson.add("translation_key", jsonNullable(entityType.descriptionId))
                 }
 
 
                 val fieldsJson = JsonArray()
                 for (entityField in entityClass.declaredFields) {
-                    if (entityField.type.equals(TrackedData::class.java)) {
+                    if (entityField.type.equals(EntityDataAccessor::class.java)) {
                         entityField.isAccessible = true
 
                         println("${entityField.declaringClass.simpleName} -> ${entityField.name}")
-                        val trackedData = entityField.get(null) as TrackedData<*>
+                        val trackedData = entityField.get(null) as EntityDataAccessor<*>
 
 
                         val fieldJson = JsonObject()
@@ -381,36 +380,35 @@ class Entities : Extractor.Extractor {
                 entityJson.add("fields", fieldsJson)
 
                 if (entityInstance is LivingEntity) {
-                    @Suppress("UNCHECKED_CAST") val type = entityType as? EntityType<out LivingEntity>
-                    val defaultAttributes = DefaultAttributeRegistry.get(type)
+                    @Suppress("UNCHECKED_CAST") val type = entityType as EntityType<out LivingEntity>
+
+                    val defaultAttributes = DefaultAttributes.getSupplier(type)
                     val attributesJson = JsonArray()
-                    if (null != defaultAttributes) {
-                        val instancesField = defaultAttributes.javaClass.getDeclaredField("instances")
-                        instancesField.isAccessible = true
-                        @Suppress("UNCHECKED_CAST") val instances =
-                            instancesField.get(defaultAttributes) as MutableMap<EntityAttribute?, EntityAttributeInstance>
+                    val instancesField = defaultAttributes.javaClass.getDeclaredField("instances")
+                    instancesField.isAccessible = true
+                    @Suppress("UNCHECKED_CAST") val instances =
+                        instancesField.get(defaultAttributes) as MutableMap<Attribute?, AttributeInstance>
 
-                        for (instance in instances.values) {
-                            val attribute = instance.attribute.value()
+                    for (instance in instances.values) {
+                        val attribute = instance.attribute.value()
 
-                            val attributeJson = JsonObject()
+                        val attributeJson = JsonObject()
 
-                            attributeJson.addProperty("id", Registries.ATTRIBUTE.getRawId(attribute))
-                            attributeJson.addProperty("name", Registries.ATTRIBUTE.getId(attribute)!!.getPath())
-                            attributeJson.addProperty("base_value", instance.baseValue)
+                        attributeJson.addProperty("id", BuiltInRegistries.ATTRIBUTE.getId(attribute))
+                        attributeJson.addProperty("name", BuiltInRegistries.ATTRIBUTE.getKey(attribute)!!.path)
+                        attributeJson.addProperty("base_value", instance.baseValue)
 
-                            attributesJson.add(attributeJson)
-                        }
+                        attributesJson.add(attributeJson)
                     }
                     entityJson.add("attributes", attributesJson)
                 }
 
-                entityInstance.boundingBox?.run {
+                entityInstance.boundingBox.run {
                     val boundingBoxJson = JsonObject()
 
-                    boundingBoxJson.addProperty("size_x", lengthX)
-                    boundingBoxJson.addProperty("size_y", lengthY)
-                    boundingBoxJson.addProperty("size_z", lengthZ)
+                    boundingBoxJson.addProperty("size_x", xsize)
+                    boundingBoxJson.addProperty("size_y", ysize)
+                    boundingBoxJson.addProperty("size_z", zsize)
 
                     entityJson.add("default_bounding_box", boundingBoxJson)
                 }

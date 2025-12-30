@@ -4,11 +4,11 @@ import com.google.gson.JsonArray
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import kr.entropi.kanden.extractor.Extractor
-import net.minecraft.item.VerticallyAttachableBlockItem
-import net.minecraft.registry.Registries
+import net.minecraft.core.BlockPos
+import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.server.MinecraftServer
-import net.minecraft.util.math.BlockPos
-import net.minecraft.world.EmptyBlockView
+import net.minecraft.world.item.StandingAndWallBlockItem
+import net.minecraft.world.level.EmptyBlockGetter
 import java.util.*
 import java.util.function.Supplier
 
@@ -25,29 +25,32 @@ class Blocks : Extractor.Extractor {
 
         val shapes = LinkedHashMap<Shape, Int?>()
 
-        for (block in Registries.BLOCK) {
+        for (block in BuiltInRegistries.BLOCK) {
+            val key = BuiltInRegistries.BLOCK.getKey(block)
+            val id = BuiltInRegistries.BLOCK.getId(block)
+
             val blockJson = JsonObject()
-            blockJson.addProperty("id", Registries.BLOCK.getRawId(block))
-            blockJson.addProperty("name", Registries.BLOCK.getId(block).getPath())
-            blockJson.addProperty("translation_key", block.getTranslationKey())
-            blockJson.addProperty("item_id", Registries.ITEM.getRawId(block.asItem()))
+            blockJson.addProperty("id", id)
+            blockJson.addProperty("name", key.path)
+            blockJson.addProperty("translation_key", block.descriptionId)
+            blockJson.addProperty("item_id", BuiltInRegistries.ITEM.getId(block.asItem()))
 
             val item = block.asItem()
-            if (item is VerticallyAttachableBlockItem) {
+            if (item is StandingAndWallBlockItem) {
                 if (item.block === block) {
                     val wallBlock = item.wallBlock
-                    blockJson.addProperty("wall_variant_id", Registries.BLOCK.getRawId(wallBlock))
+                    blockJson.addProperty("wall_variant_id", BuiltInRegistries.BLOCK.getId(wallBlock))
                 }
             }
 
             val propsJson = JsonArray()
-            for (prop in block.getStateManager().getProperties()) {
+            for (prop in block.stateDefinition.properties) {
                 val propJson = JsonObject()
 
-                propJson.addProperty("name", prop.getName())
+                propJson.addProperty("name", prop.name)
 
                 val valuesJson = JsonArray()
-                for (value in prop.getValues()) {
+                for (value in prop.allValues) {
                     valuesJson.add(value.toString().lowercase())
                 }
                 propJson.add("values", valuesJson)
@@ -57,34 +60,34 @@ class Blocks : Extractor.Extractor {
             blockJson.add("properties", propsJson)
 
             val statesJson = JsonArray()
-            for (state in block.getStateManager().getStates()) {
+            for (state in block.stateDefinition.possibleStates) {
                 val stateJson = JsonObject()
                 val id = stateIdCounter
                 stateIdCounter++
                 stateJson.addProperty("id", id)
-                stateJson.addProperty("luminance", state.getLuminance())
-                stateJson.addProperty("opaque", state.isOpaque())
-                stateJson.addProperty("replaceable", state.isReplaceable())
+                stateJson.addProperty("luminance", state.lightEmission)
+                stateJson.addProperty("opaque", state.canOcclude())
+                stateJson.addProperty("replaceable", state.canBeReplaced())
 
-                if (block.defaultState == state) {
+                if (block.defaultBlockState() == state) {
                     blockJson.addProperty("default_state_id", id)
                 }
 
                 val collisionShapeIdxsJson = JsonArray()
-                for (box in state.getCollisionShape(EmptyBlockView.INSTANCE, BlockPos.ORIGIN).boundingBoxes) {
+                for (box in state.getCollisionShape(EmptyBlockGetter.INSTANCE, BlockPos.ZERO).toAabbs()) {
                     val collisionShape = Shape(
                         box.minX, box.minY, box.minZ, box.maxX, box.maxY, box.maxZ
                     )
 
                     val idx = shapes.putIfAbsent(collisionShape, shapes.size)
-                    collisionShapeIdxsJson.add(Objects.requireNonNullElseGet<Int?>(idx, Supplier { shapes.size - 1 }))
+                    collisionShapeIdxsJson.add(Objects.requireNonNullElseGet(idx, Supplier { shapes.size - 1 }))
                 }
 
                 stateJson.add("collision_shapes", collisionShapeIdxsJson)
 
-                for (blockEntity in Registries.BLOCK_ENTITY_TYPE) {
-                    if (blockEntity.supports(state)) {
-                        stateJson.addProperty("block_entity_type", Registries.BLOCK_ENTITY_TYPE.getRawId(blockEntity))
+                for (blockEntity in BuiltInRegistries.BLOCK_ENTITY_TYPE) {
+                    if (blockEntity.isValid(state)) {
+                        stateJson.addProperty("block_entity_type", BuiltInRegistries.BLOCK_ENTITY_TYPE.getId(blockEntity))
                     }
                 }
 
@@ -96,11 +99,14 @@ class Blocks : Extractor.Extractor {
         }
 
         val blockEntitiesJson = JsonArray()
-        for (blockEntity in Registries.BLOCK_ENTITY_TYPE) {
+        for (blockEntity in BuiltInRegistries.BLOCK_ENTITY_TYPE) {
+            val id = BuiltInRegistries.BLOCK_ENTITY_TYPE.getId(blockEntity)
+            val key = BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(blockEntity)!!
+
             val blockEntityJson = JsonObject()
-            blockEntityJson.addProperty("id", Registries.BLOCK_ENTITY_TYPE.getRawId(blockEntity))
-            blockEntityJson.addProperty("ident", Registries.BLOCK_ENTITY_TYPE.getId(blockEntity).toString())
-            blockEntityJson.addProperty("name", Registries.BLOCK_ENTITY_TYPE.getId(blockEntity)!!.getPath())
+            blockEntityJson.addProperty("id", id)
+            blockEntityJson.addProperty("ident", id.toString())
+            blockEntityJson.addProperty("name", key.path)
 
             blockEntitiesJson.add(blockEntityJson)
         }
