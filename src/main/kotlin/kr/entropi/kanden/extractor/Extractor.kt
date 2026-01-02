@@ -29,7 +29,13 @@ class Extractor : ModInitializer {
             Enchants(),
             Entities(),
             Items(),
-            Misc()
+            Misc(),
+            Packets(),
+            Paintings(),
+            RegistryCodec(),
+            Sounds(),
+            Tags(),
+            TranslationKeys()
         )
 
         val outputDirectory: Path

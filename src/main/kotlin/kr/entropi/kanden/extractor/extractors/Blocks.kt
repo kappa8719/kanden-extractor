@@ -105,7 +105,7 @@ class Blocks : Extractor.Extractor {
 
             val blockEntityJson = JsonObject()
             blockEntityJson.addProperty("id", id)
-            blockEntityJson.addProperty("ident", id.toString())
+            blockEntityJson.addProperty("ident", key.toString())
             blockEntityJson.addProperty("name", key.path)
 
             blockEntitiesJson.add(blockEntityJson)

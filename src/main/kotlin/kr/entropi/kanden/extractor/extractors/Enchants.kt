@@ -20,15 +20,15 @@ class Enchants : Extractor.Extractor {
         val enchantsJson = JsonObject()
 
         for (key in enchantmentRegistry.registryKeySet()) {
-            val enchantment = enchantmentRegistry.get(key).get()
+            val enchantment = enchantmentRegistry.get(key).get().value()
+            val body = Enchantment.DIRECT_CODEC.encodeStart(
+                RegistryOps.create(
+                    JsonOps.INSTANCE, server.registryAccess()
+                ), enchantment
+            ).getOrThrow()
 
-            enchantsJson.add(
-                key.identifier().path, Enchantment.CODEC.encodeStart(
-                    RegistryOps.create(
-                        JsonOps.INSTANCE, server.registryAccess()
-                    ), enchantment
-                ).getOrThrow()
-            )
+
+            enchantsJson.add(key.identifier().toString(), body)
         }
 
         return enchantsJson

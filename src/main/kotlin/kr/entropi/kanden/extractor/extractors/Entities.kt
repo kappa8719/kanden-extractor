@@ -291,8 +291,6 @@ class Entities : Extractor.Extractor {
             }
 
             else -> {
-                println("${handler.javaClass}")
-
                 throw IllegalArgumentException(
                     "Unexpected tracked handler of ID ${EntityDataSerializers.getSerializedId(handler)}: $handler"
                 )
@@ -310,14 +308,13 @@ class Entities : Extractor.Extractor {
                 @Suppress("UNCHECKED_CAST") val entityClass =
                     (f.genericType as ParameterizedType).actualTypeArguments[0] as Class<out Entity?>
                 val entityType = f.get(null) as EntityType<*>?
-                println(entityType?.javaClass?.simpleName)
 
                 entityList.add(entityClass to entityType!!)
                 entityClassTypeMap.put(entityClass, entityType)
             }
         }
 
-        val dataTrackerField = Entity::class.java.getDeclaredField("dataTracker")
+        val dataTrackerField = Entity::class.java.getDeclaredField("entityData")
         dataTrackerField.isAccessible = true
 
         val entitiesMap = TreeMap<Class<out Entity>, JsonElement?>(ClassComparator())
@@ -361,7 +358,6 @@ class Entities : Extractor.Extractor {
                     if (entityField.type.equals(EntityDataAccessor::class.java)) {
                         entityField.isAccessible = true
 
-                        println("${entityField.declaringClass.simpleName} -> ${entityField.name}")
                         val trackedData = entityField.get(null) as EntityDataAccessor<*>
 
 
@@ -379,10 +375,9 @@ class Entities : Extractor.Extractor {
                 }
                 entityJson.add("fields", fieldsJson)
 
-                if (entityInstance is LivingEntity) {
-                    @Suppress("UNCHECKED_CAST") val type = entityType as EntityType<out LivingEntity>
-
-                    val defaultAttributes = DefaultAttributes.getSupplier(type)
+                if (entityInstance is LivingEntity && entityType is EntityType<*>) {
+                    @Suppress("UNCHECKED_CAST") val entityType = entityType as EntityType<out LivingEntity>
+                    val defaultAttributes = DefaultAttributes.getSupplier(entityType)
                     val attributesJson = JsonArray()
                     val instancesField = defaultAttributes.javaClass.getDeclaredField("instances")
                     instancesField.isAccessible = true

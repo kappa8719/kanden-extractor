@@ -3,7 +3,6 @@ package kr.entropi.kanden.extractor
 import com.google.gson.JsonNull
 import com.google.gson.JsonPrimitive
 import sun.reflect.ReflectionFactory
-import java.util.Optional
 
 fun <T> initiateWithoutConstructor(clazz: Class<T>): T {
     val factory = ReflectionFactory.getReflectionFactory()

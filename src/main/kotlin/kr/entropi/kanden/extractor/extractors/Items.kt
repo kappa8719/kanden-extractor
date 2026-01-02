@@ -42,7 +42,7 @@ class Items : Extractor.Extractor {
 
             val itemJson = JsonObject()
 
-            itemJson.addProperty("id", key.identifier().path)
+            itemJson.addProperty("id", key.identifier().toString())
             itemJson.addProperty("name", key.identifier().path)
             itemJson.addProperty("translation_key", item.descriptionId)
             itemJson.addProperty("max_stack", item.defaultMaxStackSize)
