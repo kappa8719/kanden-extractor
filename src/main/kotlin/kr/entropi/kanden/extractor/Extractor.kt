@@ -35,7 +35,8 @@ class Extractor : ModInitializer {
             RegistryCodec(),
             Sounds(),
             Tags(),
-            TranslationKeys()
+            TranslationKeys(),
+            DataComponents()
         )
 
         val outputDirectory: Path

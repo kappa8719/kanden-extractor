@@ -2,6 +2,7 @@ package kr.entropi.kanden.extractor.extractors
 
 import com.google.gson.*
 import com.mojang.authlib.GameProfile
+import com.mojang.authlib.properties.PropertyMap
 import kr.entropi.kanden.extractor.ClassComparator
 import kr.entropi.kanden.extractor.Extractor
 import kr.entropi.kanden.extractor.dummy.DummyPlayerEntity
@@ -280,8 +281,19 @@ class Entities : Extractor.Extractor {
 
             EntityDataSerializers.RESOLVABLE_PROFILE -> {
                 val profile = value as ResolvableProfile
+                val gameProfile = profile.partialProfile()
 
-                "profile" to mapOptionalToJson(profile.name()) { JsonPrimitive(it) }
+                val partialProfileJson = JsonObject()
+                partialProfileJson.addProperty("id", gameProfile.id.toString())
+                partialProfileJson.addProperty("name", gameProfile.name)
+                partialProfileJson.add(
+                    "properties", PropertyMap.Serializer().serialize(gameProfile.properties, null, null)
+                )
+
+                val json = JsonObject()
+                json.add("partial_profile", partialProfileJson)
+
+                "profile" to json
             }
 
             EntityDataSerializers.HUMANOID_ARM -> {
@@ -357,12 +369,12 @@ class Entities : Extractor.Extractor {
                 for (entityField in entityClass.declaredFields) {
                     if (entityField.type.equals(EntityDataAccessor::class.java)) {
                         entityField.isAccessible = true
-
                         val trackedData = entityField.get(null) as EntityDataAccessor<*>
 
-
                         val fieldJson = JsonObject()
-                        val fieldName = entityField.name.lowercase()
+                        val fieldName =
+                            entityField.name.lowercase().replaceFirst("data_id_", "data_").removePrefix("id_")
+                                .removeSuffix("_id")
                         fieldJson.addProperty("name", fieldName)
                         fieldJson.addProperty("index", trackedData.id())
 

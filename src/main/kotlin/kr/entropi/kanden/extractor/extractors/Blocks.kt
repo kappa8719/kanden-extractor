@@ -50,7 +50,7 @@ class Blocks : Extractor.Extractor {
                 propJson.addProperty("name", prop.name)
 
                 val valuesJson = JsonArray()
-                for (value in prop.allValues) {
+                for (value in prop.possibleValues) {
                     valuesJson.add(value.toString().lowercase())
                 }
                 propJson.add("values", valuesJson)
@@ -68,6 +68,7 @@ class Blocks : Extractor.Extractor {
                 stateJson.addProperty("luminance", state.lightEmission)
                 stateJson.addProperty("opaque", state.canOcclude())
                 stateJson.addProperty("replaceable", state.canBeReplaced())
+                stateJson.addProperty("blocks_motion", state.blocksMotion())
 
                 if (block.defaultBlockState() == state) {
                     blockJson.addProperty("default_state_id", id)
